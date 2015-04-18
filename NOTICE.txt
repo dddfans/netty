@@ -68,6 +68,14 @@ It can be obtained at:
   * HOMEPAGE:
     * https://github.com/akka/akka/blob/wip-2.2.3-for-scala-2.11/akka-actor/src/main/java/akka/dispatch/AbstractNodeQueue.java
 
+
+This product contains a modified portion of 'Apache Commons Lang', which can be obtained at:
+
+  * LICENSE:
+    * license/LICENSE.commons-lang.txt (Apache License 2.0)
+  * HOMEPAGE:
+    * http://commons.apache.org/lang/
+
 This product optionally depends on 'JZlib', a re-implementation of zlib in
 pure Java, which can be obtained at:
 

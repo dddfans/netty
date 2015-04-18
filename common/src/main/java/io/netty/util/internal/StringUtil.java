@@ -33,6 +33,7 @@ public final class StringUtil {
     public static final String EMPTY_STRING = "";
     private static final String[] BYTE2HEX_PAD = new String[256];
     private static final String[] BYTE2HEX_NOPAD = new String[256];
+    private static final char PACKAGE_SEPARATOR_CHAR = '.';
 
     static {
         // Determine the newline character of the current platform.
@@ -309,12 +310,29 @@ public final class StringUtil {
             return "null_class";
         }
 
-        Package pkg = clazz.getPackage();
-        if (pkg != null) {
-            return clazz.getName().substring(pkg.getName().length() + 1);
-        } else {
-            return clazz.getName();
+        /**
+         * Modified version of commons-lang <a href="https://github.com/apache/commons-lang/
+         * blob/LANG_3_4_RC2/src/main/java/org/apache/commons/lang3/ClassUtils.java#L194">ClassUtils</a>
+         */
+        String className = clazz.getName();
+        final StringBuilder arrayPrefix = new StringBuilder();
+
+        // Handle array encoding
+        if (className.startsWith("[")) {
+            while (className.charAt(0) == '[') {
+                className = className.substring(1);
+                arrayPrefix.append("[]");
+            }
+            // Strip Object type encoding
+            if (className.charAt(0) == 'L' && className.charAt(className.length() - 1) == ';') {
+                className = className.substring(1, className.length() - 1);
+            }
         }
+
+        final int lastDotIdx = className.lastIndexOf(PACKAGE_SEPARATOR_CHAR);
+        String out = className.substring(lastDotIdx + 1);
+
+        return out + arrayPrefix;
     }
 
     private StringUtil() {

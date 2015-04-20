@@ -23,15 +23,13 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoop;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.internal.PlatformDependent;
 
 import java.util.Deque;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.LinkedBlockingDeque;
 
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
@@ -47,15 +45,15 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
     private static final AttributeKey<ChannelPoolKey> KEY = AttributeKey.newInstance("channelPoolKey");
     private final ConcurrentMap<ChannelPoolKey, Deque<C>> pool = PlatformDependent.newConcurrentHashMap();
     private final ChannelPoolHandler<C, K> handler;
-    private final ChannelPoolHealthChecker<C, K> healthCheck;
+    private final ChannelHealthChecker<C, K> healthCheck;
     private final Bootstrap bootstrap;
 
     public SimpleChannelPool(Bootstrap bootstrap, final ChannelPoolHandler<C, K> handler) {
-        this(bootstrap, handler, ActiveChannelPoolHealthChecker.<C, K>instance());
+        this(bootstrap, handler, ActiveChannelHealthChecker.<C, K>instance());
     }
 
     public SimpleChannelPool(Bootstrap bootstrap, final ChannelPoolHandler<C, K> handler,
-                             final ChannelPoolHealthChecker<C, K> healthCheck) {
+                             final ChannelHealthChecker<C, K> healthCheck) {
         this.handler = checkNotNull(handler, "handler");
         this.healthCheck = checkNotNull(healthCheck, "healthCheck");
         this.bootstrap = checkNotNull(bootstrap, "bootstrap").clone();
@@ -95,9 +93,9 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
             if (f.isDone()) {
                 notifyHealthCheck(f, ch, key, promise);
             } else {
-                f.addListener(new GenericFutureListener<Future<? super Boolean>>() {
+                f.addListener(new FutureListener<Boolean>() {
                     @Override
-                    public void operationComplete(Future<? super Boolean> future) throws Exception {
+                    public void operationComplete(Future<Boolean> future) throws Exception {
                         notifyHealthCheck(future, ch, key, promise);
                     }
                 });
@@ -110,8 +108,13 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
 
     private void notifyHealthCheck(Future<? super Boolean> future, C ch, K key, Promise<C> promise) {
         if (future.isSuccess()) {
-            handler.channelAcquired(ch, key);
-            promise.setSuccess(ch);
+            try {
+                handler.channelAcquired(ch, key);
+                promise.setSuccess(ch);
+            } catch (Throwable cause) {
+                ch.close();
+                promise.setFailure(cause);
+            }
         } else {
             ch.close();
             acquire(key, promise);
@@ -167,7 +170,7 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
             if (key != null) {
                 Deque<C> channels = pool.get(key);
                 if (channels == null) {
-                    channels = newDeque();
+                    channels = PlatformDependent.newConcurrentDeque();
                     Deque<C> old = pool.putIfAbsent(key, channels);
                     if (old != null) {
                         channels = old;
@@ -186,15 +189,8 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
 
         } catch (Throwable cause) {
             promise.setFailure(cause);
+            channel.close();
         }
         return promise;
-    }
-
-    private static <C extends Channel> Deque<C> newDeque() {
-        if (PlatformDependent.javaVersion() < 7) {
-            return new LinkedBlockingDeque<C>();
-        } else {
-            return new ConcurrentLinkedDeque<C>();
-        }
     }
 }

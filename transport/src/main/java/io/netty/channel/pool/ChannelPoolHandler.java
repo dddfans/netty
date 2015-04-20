@@ -33,7 +33,7 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
      * @param ch        the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was released
      */
-    void channelReleased(C ch, K key);
+    void channelReleased(C ch, K key) throws Exception;
 
     /**
      * Called once a {@link Channel} was acquired by calling {@link ChannelPool#acquire(ChannelPoolKey)} or
@@ -42,7 +42,7 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
      * @param ch       the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was acquired
      */
-    void channelAcquired(C ch, K key);
+    void channelAcquired(C ch, K key) throws Exception;
 
     /**
      * Called once a new {@link Channel} is created in the {@link ChannelPool}.
@@ -50,5 +50,5 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
      * @param ch        the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was requested
      */
-    void channelCreated(C ch, K key);
+    void channelCreated(C ch, K key) throws Exception;
 }

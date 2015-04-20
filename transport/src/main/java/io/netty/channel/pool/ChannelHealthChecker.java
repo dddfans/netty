@@ -27,7 +27,7 @@ import io.netty.util.concurrent.Promise;
  * @param <C>   the {@link Channel} type to pool.
  * @param <K>   the {@link ChannelPoolKey} that is used to store and lookup the {@link Channel}s.
  */
-public interface ChannelPoolHealthChecker<C extends Channel, K extends ChannelPoolKey> {
+public interface ChannelHealthChecker<C extends Channel, K extends ChannelPoolKey> {
 
     /**
      * Check if the given channel is healthy which means it can be used. The returned {@link Future} is notified once

@@ -20,25 +20,25 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 
 /**
- * {@link ChannelPoolHealthChecker} implementation that checks if {@link Channel#isActive()} returns {@code true}.
+ * {@link ChannelHealthChecker} implementation that checks if {@link Channel#isActive()} returns {@code true}.
  *
  * @param <C>   the {@link Channel} type to pool.
  * @param <K>   the {@link ChannelPoolKey} that is used to store and lookup the {@link Channel}s.
  */
-public final class ActiveChannelPoolHealthChecker<C extends Channel, K extends ChannelPoolKey>
-        implements ChannelPoolHealthChecker<C, K> {
+public final class ActiveChannelHealthChecker<C extends Channel, K extends ChannelPoolKey>
+        implements ChannelHealthChecker<C, K> {
 
     private static final Future<Boolean> ACTIVE = ImmediateEventExecutor.INSTANCE.newSucceededFuture(Boolean.TRUE);
     private static final Future<Boolean> NOT_ACTIVE = ImmediateEventExecutor.INSTANCE.newSucceededFuture(Boolean.FALSE);
 
-    private ActiveChannelPoolHealthChecker() { }
+    private ActiveChannelHealthChecker() { }
 
     @SuppressWarnings("rawtypes")
-    private static final ChannelPoolHealthChecker
-            INSTANCE = new ActiveChannelPoolHealthChecker<Channel, ChannelPoolKey>();
+    private static final ChannelHealthChecker
+            INSTANCE = new ActiveChannelHealthChecker<Channel, ChannelPoolKey>();
 
     @SuppressWarnings("unchecked")
-    public static <C extends Channel, K extends ChannelPoolKey> ChannelPoolHealthChecker<C, K> instance() {
+    public static <C extends Channel, K extends ChannelPoolKey> ChannelHealthChecker<C, K> instance() {
         return INSTANCE;
     }
 

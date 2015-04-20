@@ -30,7 +30,7 @@ public abstract class AbstractChannelPoolHandler<C extends Channel, K extends Ch
      * NOOP implementation, sub-classes may override this.
      */
     @Override
-    public void channelAcquired(@SuppressWarnings("unused") C ch, @SuppressWarnings("unused") K key) {
+    public void channelAcquired(@SuppressWarnings("unused") C ch, @SuppressWarnings("unused") K key) throws Exception {
         // NOOP
     }
 
@@ -38,7 +38,7 @@ public abstract class AbstractChannelPoolHandler<C extends Channel, K extends Ch
      * NOOP implementation, sub-classes may override this.
      */
     @Override
-    public void channelReleased(@SuppressWarnings("unused") C ch, @SuppressWarnings("unused") K key) {
+    public void channelReleased(@SuppressWarnings("unused") C ch, @SuppressWarnings("unused") K key) throws Exception{
         // NOOP
     }
 }

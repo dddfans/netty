@@ -40,7 +40,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  */
 public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey> implements ChannelPool<C, K> {
     private static final IllegalStateException FULL_EXCEPTION =
-            new IllegalStateException("PendingAcquireQueue is full");
+            new IllegalStateException("Too many outstanding acquire operations");
     static {
         FULL_EXCEPTION.setStackTrace(EmptyArrays.EMPTY_STACK_TRACE);
     }
@@ -85,7 +85,7 @@ public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey>
 
     private FixedChannelPool(ChannelPool<C, K> pool, int maxConnections, Queue<AcquireTask<C, K>> pendingAcquireQueue) {
         if (maxConnections < 1) {
-            throw new IllegalArgumentException("maxConnections must be >= 1 but was " + maxConnections);
+            throw new IllegalArgumentException("maxConnections: " + maxConnections + " (expected: >= 1)");
         }
         this.pool = checkNotNull(pool, "pool");
         this.pendingAcquireQueue = checkNotNull(pendingAcquireQueue, "pendingAcquireQueue");

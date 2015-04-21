@@ -24,8 +24,8 @@ import io.netty.channel.EventLoop;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
-import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.Promise;
+import io.netty.util.internal.OneTimeTask;
 import io.netty.util.internal.PlatformDependent;
 
 import java.util.Deque;
@@ -61,6 +61,7 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
             @SuppressWarnings("unchecked")
             @Override
             protected void initChannel(C ch) throws Exception {
+                assert ch.eventLoop().inEventLoop();
                 K key = (K) ch.attr(KEY).get();
                 assert key != null;
                 handler.channelCreated(ch, key);
@@ -70,7 +71,11 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
 
     @Override
     public Future<C> acquire(K key) {
-        return acquire(key, ImmediateEventExecutor.INSTANCE.<C>newPromise());
+        EventLoop loop = key.eventLoop();
+        if (loop == null) {
+            loop = bootstrap.group().next();
+        }
+        return acquire(key, loop.<C>newPromise());
     }
 
     @Override
@@ -89,14 +94,14 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
                 newChannel(key, promise);
                 return promise;
             }
-            Future<Boolean> f = healthCheck.isHealthy(ch, key);
-            if (f.isDone()) {
-                notifyHealthCheck(f, ch, key, promise);
+            EventLoop loop = ch.eventLoop();
+            if (loop.inEventLoop()) {
+                doHealthCheck(key, ch, promise);
             } else {
-                f.addListener(new FutureListener<Boolean>() {
+                loop.execute(new OneTimeTask() {
                     @Override
-                    public void operationComplete(Future<Boolean> future) throws Exception {
-                        notifyHealthCheck(future, ch, key, promise);
+                    public void run() {
+                        doHealthCheck(key, ch, promise);
                     }
                 });
             }
@@ -106,7 +111,25 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
         return promise;
     }
 
+    private void doHealthCheck(final K key, final C ch, final Promise<C> promise) {
+        assert ch.eventLoop().inEventLoop();
+
+        Future<Boolean> f = healthCheck.isHealthy(ch, key);
+        if (f.isDone()) {
+            notifyHealthCheck(f, ch, key, promise);
+        } else {
+            f.addListener(new FutureListener<Boolean>() {
+                @Override
+                public void operationComplete(Future<Boolean> future) throws Exception {
+                    notifyHealthCheck(future, ch, key, promise);
+                }
+            });
+        }
+    }
+
     private void notifyHealthCheck(Future<? super Boolean> future, C ch, K key, Promise<C> promise) {
+        assert ch.eventLoop().inEventLoop();
+
         if (future.isSuccess()) {
             try {
                 handler.channelAcquired(ch, key);
@@ -157,16 +180,16 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
 
     @Override
     public Future<Boolean> release(C channel) {
-        return release(channel, ImmediateEventExecutor.INSTANCE.<Boolean>newPromise());
+        return release(channel, channel.eventLoop().<Boolean>newPromise());
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public Future<Boolean> release(C channel, Promise<Boolean> promise) {
+    public Future<Boolean> release(final C channel, final Promise<Boolean> promise) {
         checkNotNull(channel, "channel");
         checkNotNull(promise, "promise");
         try {
-            K key = (K) channel.attr(KEY).getAndSet(null);
+            final K key = (K) channel.attr(KEY).getAndSet(null);
             if (key != null) {
                 Deque<C> channels = pool.get(key);
                 if (channels == null) {
@@ -176,12 +199,18 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
                         channels = old;
                     }
                 }
+                final Deque<C> channelQueue = channels;
 
-                if (channels.add(channel)) {
-                    handler.channelReleased(channel, key);
-                    promise.setSuccess(Boolean.TRUE);
+                EventLoop loop = channel.eventLoop();
+                if (loop.inEventLoop()) {
+                    doReleaseChannel(channelQueue, key, channel, promise);
                 } else {
-                    promise.setSuccess(Boolean.FALSE);
+                    loop.execute(new OneTimeTask() {
+                        @Override
+                        public void run() {
+                            doReleaseChannel(channelQueue, key, channel, promise);
+                        }
+                    });
                 }
             } else {
                 promise.setSuccess(Boolean.FALSE);
@@ -192,5 +221,21 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
             channel.close();
         }
         return promise;
+    }
+
+    private void doReleaseChannel(Deque<C> channels, K key, C channel, Promise<Boolean> promise) {
+        assert channel.eventLoop().inEventLoop();
+
+        try {
+            if (channels.add(channel)) {
+                handler.channelReleased(channel, key);
+                promise.setSuccess(Boolean.TRUE);
+            } else {
+                promise.setSuccess(Boolean.FALSE);
+            }
+        } catch (Throwable cause) {
+            channel.close();
+            promise.setFailure(cause);
+        }
     }
 }

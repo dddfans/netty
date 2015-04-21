@@ -16,6 +16,7 @@
 package io.netty.channel.pool;
 
 import io.netty.channel.Channel;
+import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 
@@ -32,6 +33,8 @@ public interface ChannelHealthChecker<C extends Channel, K extends ChannelPoolKe
     /**
      * Check if the given channel is healthy which means it can be used. The returned {@link Future} is notified once
      * the check is complete. If notified with {@link Boolean#TRUE} it can be used {@link Boolean#FALSE} otherwise.
+     *
+     * This method will be called by the {@link EventLoop} of the {@link Channel}.
      */
     Future<Boolean> isHealthy(C channel, K key);
 }

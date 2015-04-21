@@ -35,6 +35,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  * {@link ChannelPool} implementation that takes another {@link ChannelPool} implementation and enfore a maximum
  * number of concurrent connections.
  *
+ * TODO: Fix me!
  * @param <C>   the {@link Channel} type to pool.
  * @param <K>   the {@link ChannelPoolKey} that is used to store and lookup the {@link Channel}s.
  */

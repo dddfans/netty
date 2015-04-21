@@ -17,6 +17,7 @@ package io.netty.channel.pool;
 
 
 import io.netty.channel.Channel;
+import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.Promise;
 
 /**
@@ -30,6 +31,8 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
      * Called once a {@link Channel} was released by calling {@link ChannelPool#release(Channel)} or
      * {@link ChannelPool#release(Channel, Promise)}.
      *
+     * This method will be called by the {@link EventLoop} of the {@link Channel}.
+     *
      * @param ch        the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was released
      */
@@ -39,6 +42,8 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
      * Called once a {@link Channel} was acquired by calling {@link ChannelPool#acquire(ChannelPoolKey)} or
      * {@link ChannelPool#acquire(ChannelPoolKey, Promise)}.
      *
+     * This method will be called by the {@link EventLoop} of the {@link Channel}.
+     *
      * @param ch       the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was acquired
      */
@@ -46,6 +51,8 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
 
     /**
      * Called once a new {@link Channel} is created in the {@link ChannelPool}.
+     *
+     * This method will be called by the {@link EventLoop} of the {@link Channel}.
      *
      * @param ch        the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was requested

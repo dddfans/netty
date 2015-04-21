@@ -41,13 +41,13 @@ public interface ChannelPool<C extends Channel, K extends ChannelPoolKey> {
 
     /**
      * Release a {@link Channel} back to this {@link ChannelPool}. The returned {@link Future} is notified once
-     * the release is successful and failed otherwise.
+     * the release is successful and failed otherwise. When failed the {@link Channel} will automatically closed.
      */
     Future<Boolean> release(C channel);
 
     /**
      * Release a {@link Channel} back to this {@link ChannelPool}.  The given {@link Promise} is notified once
-     * the release is successful and failed otherwise.
+     * the release is successful and failed otherwise. When failed the {@link Channel} will automatically closed.
      */
     Future<Boolean> release(C channel, Promise<Boolean> promise);
 }

@@ -21,6 +21,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoop;
+import io.netty.channel.pool.ChannelPoolSegmentFactory.ChannelPoolSegment;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
@@ -28,7 +29,6 @@ import io.netty.util.concurrent.Promise;
 import io.netty.util.internal.OneTimeTask;
 import io.netty.util.internal.PlatformDependent;
 
-import java.util.Deque;
 import java.util.concurrent.ConcurrentMap;
 
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
@@ -43,19 +43,23 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
 public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey> implements ChannelPool<C, K> {
 
     private static final AttributeKey<ChannelPoolKey> KEY = AttributeKey.newInstance("channelPoolKey");
-    private final ConcurrentMap<ChannelPoolKey, Deque<C>> pool = PlatformDependent.newConcurrentHashMap();
+    private final ConcurrentMap<ChannelPoolKey, ChannelPoolSegment<C>> pool = PlatformDependent.newConcurrentHashMap();
     private final ChannelPoolHandler<C, K> handler;
     private final ChannelHealthChecker<C, K> healthCheck;
+    private final ChannelPoolSegmentFactory<C> segmentFactory;
     private final Bootstrap bootstrap;
 
     public SimpleChannelPool(Bootstrap bootstrap, final ChannelPoolHandler<C, K> handler) {
-        this(bootstrap, handler, ActiveChannelHealthChecker.<C, K>instance());
+        this(bootstrap, handler,
+             ActiveChannelHealthChecker.<C, K>instance(), ChannelPoolSegmentFactories.<C>newLifoFactory());
     }
 
     public SimpleChannelPool(Bootstrap bootstrap, final ChannelPoolHandler<C, K> handler,
-                             final ChannelHealthChecker<C, K> healthCheck) {
+                             final ChannelHealthChecker<C, K> healthCheck,
+                             final ChannelPoolSegmentFactory<C> segmentFactory) {
         this.handler = checkNotNull(handler, "handler");
         this.healthCheck = checkNotNull(healthCheck, "healthCheck");
+        this.segmentFactory = checkNotNull(segmentFactory, "segmentFactory");
         this.bootstrap = checkNotNull(bootstrap, "bootstrap").clone();
         this.bootstrap.handler(new ChannelInitializer<C>() {
             @SuppressWarnings("unchecked")
@@ -83,13 +87,13 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
         checkNotNull(key, "key");
         checkNotNull(promise, "promise");
         try {
-            Deque<C> channels = pool.get(key);
+            ChannelPoolSegment<C> channels = pool.get(key);
             if (channels == null) {
                 newChannel(key, promise);
                 return promise;
             }
 
-            final C ch = channels.pollLast();
+            final C ch = channels.poll();
             if (ch == null) {
                 newChannel(key, promise);
                 return promise;
@@ -191,15 +195,15 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
         try {
             final K key = (K) channel.attr(KEY).getAndSet(null);
             if (key != null) {
-                Deque<C> channels = pool.get(key);
+                ChannelPoolSegment<C> channels = pool.get(key);
                 if (channels == null) {
-                    channels = PlatformDependent.newConcurrentDeque();
-                    Deque<C> old = pool.putIfAbsent(key, channels);
+                    channels = segmentFactory.newSegment();
+                    ChannelPoolSegment<C> old = pool.putIfAbsent(key, channels);
                     if (old != null) {
                         channels = old;
                     }
                 }
-                final Deque<C> channelQueue = channels;
+                final ChannelPoolSegment<C> channelQueue = channels;
 
                 EventLoop loop = channel.eventLoop();
                 if (loop.inEventLoop()) {
@@ -223,11 +227,11 @@ public final class SimpleChannelPool<C extends Channel, K extends ChannelPoolKey
         return promise;
     }
 
-    private void doReleaseChannel(Deque<C> channels, K key, C channel, Promise<Boolean> promise) {
+    private void doReleaseChannel(ChannelPoolSegment<C> channels, K key, C channel, Promise<Boolean> promise) {
         assert channel.eventLoop().inEventLoop();
 
         try {
-            if (channels.add(channel)) {
+            if (channels.offer(channel)) {
                 handler.channelReleased(channel, key);
                 promise.setSuccess(Boolean.TRUE);
             } else {

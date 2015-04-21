@@ -433,7 +433,6 @@ public final class PlatformDependent {
         return PlatformDependent0.getSystemClassLoader();
     }
 
-
     /**
      * Returns a new concurrent {@link Deque}.
      */
